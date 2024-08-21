@@ -24,12 +24,14 @@ struct CameraView: UIViewControllerRepresentable {
         do {
             videoInput = try AVCaptureDeviceInput(device: videoCaptureDevice)
         } catch {
+            print("Error al obtener entrada de video: \(error.localizedDescription)")
             return viewController
         }
 
         if captureSession.canAddInput(videoInput) {
             captureSession.addInput(videoInput)
         } else {
+            print("No se pudo agregar entrada de video al captureSession")
             return viewController
         }
 
@@ -39,15 +41,18 @@ struct CameraView: UIViewControllerRepresentable {
         if captureSession.canAddOutput(videoOutput) {
             captureSession.addOutput(videoOutput)
         } else {
+            print("No se pudo agregar salida de video al captureSession")
             return viewController
         }
 
         let previewLayer = AVCaptureVideoPreviewLayer(session: captureSession)
-        previewLayer.frame = viewController.view.layer.bounds
+        previewLayer.frame = viewController.view.bounds
         previewLayer.videoGravity = .resizeAspectFill
         viewController.view.layer.addSublayer(previewLayer)
 
-        captureSession.startRunning()
+        DispatchQueue.global(qos: .userInitiated).async {
+            captureSession.startRunning()
+        }
         
         return viewController
     }
@@ -74,11 +79,11 @@ struct CameraView: UIViewControllerRepresentable {
         }
 
         func startScanning() {
-            // Custom implementation to start scanning if needed
+            // Implementación personalizada para iniciar escaneo si es necesario
         }
 
         func stopScanning() {
-            // Custom implementation to stop scanning if needed
+            // Implementación personalizada para detener escaneo si es necesario
         }
 
         func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
@@ -149,5 +154,17 @@ struct CameraView: UIViewControllerRepresentable {
                 }
             }
         }
+    }
+}
+
+struct CameraView_Previews: PreviewProvider {
+    static var previews: some View {
+        CameraView(
+            recognizedText: .constant(""),
+            startScanning: .constant(true),
+            detectedBoundingBox: .constant(CGRect.zero),
+            inputImage: .constant(nil),
+            showImagePicker: .constant(false)
+        )
     }
 }

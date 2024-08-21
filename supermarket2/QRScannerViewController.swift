@@ -28,10 +28,8 @@ class QRScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsD
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { granted in
                 if granted {
-                    DispatchQueue.main.async {
-                        DispatchQueue.global(qos: .userInitiated).async {
-                            self.setupCamera()
-                        }
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        self.setupCamera()
                     }
                 }
             }
@@ -65,29 +63,48 @@ class QRScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsD
         if captureSession.canAddOutput(metadataOutput) {
             captureSession.addOutput(metadataOutput)
             metadataOutput.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
-            metadataOutput.metadataObjectTypes = [.qr, .ean8, .ean13, .pdf417]
-
-            let detectionArea = CGRect(x: 0.4, y: 0.2, width: 0.2, height: 0.6)
-            metadataOutput.rectOfInterest = detectionArea
+            metadataOutput.metadataObjectTypes = [
+                .qr,              // QR Code
+                .ean8,            // EAN-8
+                .ean13,           // EAN-13
+                .pdf417,          // PDF417
+                .upce,            // UPC-E
+                .code39,          // Code 39
+                .code39Mod43,     // Code 39 Mod 43
+                .code93,          // Code 93
+                .code128,         // Code 128
+                .interleaved2of5, // Interleaved 2 of 5
+                .itf14,           // ITF-14
+                .aztec,           // Aztec Code
+                .dataMatrix       // Data Matrix
+            ]
+            // Ampliar el área de detección a toda la vista para mejorar la detección
+            metadataOutput.rectOfInterest = CGRect(x: 0, y: 0, width: 1, height: 1)
 
             DispatchQueue.main.async {
-                self.detectionRectangle = UIView()
-                self.detectionRectangle.layer.borderColor = UIColor.green.cgColor
-                self.detectionRectangle.layer.borderWidth = 2
-                self.view.addSubview(self.detectionRectangle)
-
-                self.previewLayer = AVCaptureVideoPreviewLayer(session: self.captureSession)
-                self.previewLayer.frame = self.view.layer.bounds
-                self.previewLayer.videoGravity = .resizeAspectFill
-                self.view.layer.addSublayer(self.previewLayer)
-
-                self.view.bringSubviewToFront(self.detectionRectangle)
+                self.setupPreviewLayer()
+                self.setupDetectionRectangle()
                 self.captureSession.startRunning()
-                self.updateDetectionRectangle()
             }
         } else {
             return
         }
+    }
+
+    func setupPreviewLayer() {
+        self.previewLayer = AVCaptureVideoPreviewLayer(session: self.captureSession)
+        self.previewLayer.frame = self.view.layer.bounds
+        self.previewLayer.videoGravity = .resizeAspectFill
+        self.view.layer.addSublayer(self.previewLayer)
+    }
+
+    func setupDetectionRectangle() {
+        self.detectionRectangle = UIView()
+        self.detectionRectangle.layer.borderColor = UIColor.green.cgColor
+        self.detectionRectangle.layer.borderWidth = 2
+        self.view.addSubview(self.detectionRectangle)
+        self.view.bringSubviewToFront(self.detectionRectangle)
+        updateDetectionRectangle()
     }
 
     func updateDetectionRectangle() {
@@ -116,19 +133,30 @@ class QRScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsD
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
         if let metadataObject = metadataObjects.first {
             guard let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject else { return }
-            guard readableObject.stringValue != nil else { return }
+            guard let stringValue = readableObject.stringValue else {
+                print("Código QR no contiene un valor legible.")
+                return
+            }
+            
+            print("Código detectado: \(stringValue)") // Verifica el valor detectado aquí
+            
             AudioServicesPlaySystemSound(SystemSoundID(kSystemSoundID_Vibrate))
-
             captureSession.stopRunning()
 
-            sendQRCodeToAPI()
+            // Mostrar el código QR detectado en una alerta
+            showAlert(title: "Código QR Detectado", message: stringValue)
+
+            // Comentar el envío a la API
+            //sendQRCodeToAPI(with: stringValue)
         }
     }
 
-    func sendQRCodeToAPI() {
-        let fixedCode = "01-01-01-01"
+    /*
+    // Comentado: Enviar el código QR detectado a la API
+    func sendQRCodeToAPI(with code: String) {
+        // Usa el valor del código QR detectado
         let baseUrl = "https://ews-emea.api.bosch.com/manufacturing/machine/related_mae_information/production_orders_pix/d/v1/pix/createdorconfirmTO/"
-        guard let url = URL(string: baseUrl + fixedCode) else {
+        guard let url = URL(string: baseUrl + code) else {
             showAlert(title: "Error", message: "URL inválida")
             return
         }
@@ -145,12 +173,14 @@ class QRScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsD
             }
 
             DispatchQueue.main.async {
+                print("Respuesta del servidor: \(message)") // Verifica la respuesta aquí
                 self.showAlert(title: "Resultado", message: message)
             }
         }
 
         task.resume()
     }
+    */
 
     func showAlert(title: String, message: String) {
         let alertController = UIAlertController(title: title, message: message, preferredStyle: .alert)
